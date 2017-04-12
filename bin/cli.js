@@ -18,7 +18,7 @@ const cli = yargs
   .command('generate', 'Generate static website')
   .option('port', {
     description: 'Server port',
-    default: 3000
+    default: process.env.PORT || 3000
   })
   .option('config', {
     description: 'Path to config file',
