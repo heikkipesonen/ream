@@ -1,30 +1,55 @@
 import Vue from 'vue'
-import DefaultApp from './App.vue'
 import Meta from 'vue-meta'
+import entry from '@alias/entry'
 
-Vue.use(Meta, {
+const meta = entry.meta || {
   keyName: 'head',
-  attribute: 'data-rehead',
-  ssrAttribute: 'data-rehead-rendered',
-  tagIDKeyName: 'rehid'
+  attribute: 'data-ream-head',
+  ssrAttribute: 'data-ream-head-ssr',
+  tagIDKeyName: 'ream-head-id'
+}
+
+Vue.use(Meta, meta)
+
+Vue.mixin({
+  beforeRouteUpdate (to, from, next) {
+    const { preFetch } = this.$options
+    if (preFetch) {
+      preFetch({
+        store: this.$store,
+        route: to
+      }).then(next).catch(next)
+    } else {
+      next()
+    }
+  }
 })
 
-export default ({
-  App = DefaultApp,
-  store,
-  router
-} = {}) => {
-  if (store) {
-    const { sync } = require('vuex-router-sync')
-    sync(store, router)
+export default ssrContext => {
+  const root = entry.root || '#app'
+  const router = entry.createRouter()
+  let store
+  if (entry.createStore) {
+    store = entry.createStore()
   }
 
-  return new Vue({
+  const app = new Vue({
+    ssrContext,
     store,
     router,
-    created() {
-      Vue.prototype.$ream = this
-    },
-    render: h => h(App)
+    render: h => {
+      return h('div', {
+        attrs: {
+          id: root.substring(1)
+        }
+      }, [h(entry.App || 'router-view')])
+    }
   })
+
+  return {
+    app,
+    router,
+    store,
+    root
+  }
 }

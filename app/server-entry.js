@@ -1,46 +1,35 @@
-import entry from '@alias/entry'
+import Vue from 'vue'
 import createApp from './create-app'
-import defaultHandler from './default-handler'
 
-const { router, store, handlers = [] } = entry
-
-const app = createApp(entry)
-
-const meta = app.$meta()
-
-export default context => {
-  const dev = context.dev
+export default ssrContext => {
+  const dev = ssrContext.dev
   const s = dev && Date.now()
 
-  // We will inline `data` into HTML markup
-  // Just like what we do for Vuex state
-  const deliverData = data => {
-    if (data) {
-      for (const key in data) {
-        context.data[key] = data[key]
-      }
-    }
-  }
-
   return new Promise((resolve, reject) => {
-    const handlerContext = {
-      store,
-      router,
-      deliverData,
-      isDev: context.dev,
-      isServer: true,
-      handleError: reject
-    }
+    const { app, router, store } = createApp(ssrContext)
 
-    for (const handler of [defaultHandler, ...handlers]) {
-      handler(handlerContext)
-    }
-
-    router.push(context.url)
+    router.push(ssrContext.url)
 
     router.onReady(() => {
-      context.meta = meta
-      resolve(app)
+      const route = router.currentRoute
+      const matchedComponents = router.getMatchedComponents()
+      Promise.all(matchedComponents.map((Component, index) => {
+        // delete Component._Ctor
+        const ps = []
+        const ctx = { route, store }
+        if (Component.preFetch) {
+          ps.push(Component.preFetch(ctx))
+        }
+        return Promise.all(ps)
+      })).then(() => {
+        if (store) {
+          ssrContext.state = store.state
+        }
+        if (app.$meta) {
+          ssrContext.meta = app.$meta()
+        }
+        resolve(app)
+      }).catch(reject)
     })
   })
 }
